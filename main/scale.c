@@ -85,13 +85,13 @@ static void rx_task(void *arg)
 }
 
 #define M 10
-unsigned int filter2( void )
+int filter2( void )
 {
-    unsigned int value_buf[M];
-    unsigned int count, i, j, temp;
+    int value_buf[M];
+    int count, i, j, temp;
     for( count = 0; count < M; count++ )
     {
-        value_buf[count] = Get_Weight();
+        value_buf[count] = (Get_Weight()-8230850)/103;
         vTaskDelay(110 / portTICK_PERIOD_MS);
     }
     for( j = 0; j < M - 1; j++ )
@@ -111,24 +111,25 @@ unsigned int filter2( void )
 
 void app_main(void)
 {
-    long gross=0;//毛重
+    int gross=0;//毛重
     long Weight = 0;
     printf("system start!\n");
     set_mbdata();
     uart_init();
     xTaskCreate(rx_task, "uart_rx_task", 1024*4, NULL, configMAX_PRIORITIES, NULL);
     gatts_app();
-    // Init_Hx711();
-    // gross = Get_Weight();	//计算放在传感器上的重物重量
-    char *data="12345";
+    Init_Hx711();
+    gross = filter2();	//计算放在传感器上的重物重量
+    //char *data="12345";
     //uint8_t readbuf[5]={0,0,0,0,0};
     while (1)
     {
-	    // printf("%d",filter2());	//串口显示重量
-	    // printf(" g\n");	//显示单位
-	    // printf("\n");		//显示单位
+	    //printf("%d",filter2()-gross);	//串口显示重量
+        printf("%ld",(Get_Weight()-8230850)/103-gross);	//串口显示重量
+	    printf(" g\n");	//显示单位
+	    printf("\n");		//显示单位
         
-        uart_write_bytes(UART_NUM_1, data, 5);
+        //uart_write_bytes(UART_NUM_1, data, 5);
         // vTaskDelay(50 / portTICK_PERIOD_MS);				//延时1s
         // int len=uart_read_bytes(UART_NUM_1, readbuf, 5, 10 / portTICK_RATE_MS);
         // if (len>0)
@@ -136,7 +137,7 @@ void app_main(void)
         //     esp_log_buffer_hex("serial  ", readbuf, 5);
         // }
         
-	    vTaskDelay(1300 / portTICK_PERIOD_MS);				//延时1s
+	    vTaskDelay(300 / portTICK_PERIOD_MS);				//延时1s
 
         
     }

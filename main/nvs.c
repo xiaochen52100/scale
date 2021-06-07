@@ -7,7 +7,7 @@
 
 Parameter parameter;
 Realtime_value realtime_value;
-static void GetConfigParam(void)
+void GetConfigParam(void)
 {  
     esp_err_t err;
     nvs_handle_t config_handle;   
@@ -23,7 +23,7 @@ static void GetConfigParam(void)
         // Read
         printf("Get parameter and key from NVS ... \n");
         //get parameter
-        len = sizeof(&Parameter);
+        len = sizeof(&parameter);
         err = nvs_get_str(config_handle, "parameter", &parameter, &len);
         if(err==ESP_OK)
         {
@@ -43,7 +43,7 @@ static void GetConfigParam(void)
     nvs_close(config_handle);
 }
  
-static void SetConfigParam(void)
+void SetConfigParam(void)
 {
     esp_err_t err;
     nvs_handle_t config_handle;  

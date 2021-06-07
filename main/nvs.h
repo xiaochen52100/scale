@@ -25,8 +25,8 @@ typedef struct _realtime_value
     uint16_t remove_skin; //去皮 执行完后会自动复位  
 
 }Realtime_value;
-
-
+void GetConfigParam(void);
+void SetConfigParam(void);
 #ifdef __cplusplus
 }
 #endif
