@@ -5,17 +5,15 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 
-
-
-static void GetWifiParam(void)
+Parameter parameter;
+Realtime_value realtime_value;
+static void GetConfigParam(void)
 {  
     esp_err_t err;
-    nvs_handle_t wificonfig_handle;   
-    char wifi_ssid[33] = { 0 };
-    char wifi_passwd[65] = { 0 };
+    nvs_handle_t config_handle;   
     size_t len;
  
-    err = nvs_open("wificonfig", NVS_READWRITE, &wificonfig_handle);
+    err = nvs_open("deviceParameter", NVS_READWRITE, &config_handle);
     if (err != ESP_OK) {
         printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
     } 
@@ -23,76 +21,53 @@ static void GetWifiParam(void)
     {
         printf("opening NVS handle Done\n");
         // Read
-        printf("Get ssid and key from NVS ... \n");
-        //get ssid
-        len = sizeof(wifi_ssid);
-        err = nvs_get_str(wificonfig_handle, "ssid", wifi_ssid, &len);
+        printf("Get parameter and key from NVS ... \n");
+        //get parameter
+        len = sizeof(&Parameter);
+        err = nvs_get_str(config_handle, "parameter", &parameter, &len);
         if(err==ESP_OK)
         {
-            printf("Get ssid success!\n");
-            printf("ssid=%s\n",wifi_ssid);
-            printf("ssid_len=%d\n",len);
+            printf("Get parameter success!\n");
+            printf("parameter_len=%d\n",len);
         }
         else
         {
            printf("get err =0x%x\n",err);
-           printf("Get ssid fail!\n");
+           printf("Get parameter fail!\n");
         }
-        //get password
-        len = sizeof(wifi_passwd);
-        err = nvs_get_str(wificonfig_handle, "key", wifi_passwd, &len);     
-        if(err==ESP_OK)
-        {
-            printf("Get key success!\n");
-            printf("password=%s\n",wifi_passwd);
-            printf("password_len=%d\n",len);
-        }
-        else
-        {
-           printf("get err =0x%x\n",err);
-           printf("Get ssid fail!\n");
-        }
-        err = nvs_commit(wificonfig_handle);
+        err = nvs_commit(config_handle);
         printf((err != ESP_OK) ? "nvs_commit Failed!\n" : " nvs_commit Done\n");
     }
     
     // Close
-    nvs_close(wificonfig_handle);
+    nvs_close(config_handle);
 }
  
-static void SetWifiParam(void)
+static void SetConfigParam(void)
 {
     esp_err_t err;
-    nvs_handle_t my_handle;  
+    nvs_handle_t config_handle;  
     
-    err = nvs_open("wificonfig", NVS_READWRITE, &my_handle);
+    err = nvs_open("deviceParameter", NVS_READWRITE, &config_handle);
     if (err != ESP_OK) {
         printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
     } 
     else 
     {
         printf("opening NVS handle Done\n");
-        printf("Set ssid and key from NVS ... \n");
-        //write ssid
-        err=nvs_set_str(my_handle,"ssid",g_ssid);
+        printf("Set parameter from NVS ... \n");
+        //write parameter
+        err=nvs_set_str(config_handle,"parameter",&parameter);
         if(err==ESP_OK)
-            printf("set ssid success!\n");
+            printf("set parameter success!\n");
         else
         {
-            printf("set ssid fail!\n");
-        }  
-        //write key
-        err=nvs_set_str(my_handle,"key",g_password);
-        if(err==ESP_OK)
-            printf("set password success!\n");
-        else
-        {
-            printf("set password fail!\n");
+            printf("set parameter fail!\n");
         }   
-        err = nvs_commit(my_handle);
+        err = nvs_commit(config_handle);
         printf((err != ESP_OK) ? "nvs_commit Failed!\n" : "nvs_commit Done\n");
     }
      // Close
-    nvs_close(my_handle);
+    nvs_close(config_handle);
     printf("--------------------------------------\n");
 }
