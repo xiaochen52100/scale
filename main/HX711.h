@@ -14,6 +14,7 @@ extern "C" {
 void get_weight_task(void *arg);
 extern unsigned long adc;
 extern unsigned long adc_old;
+extern int32_t weight_real;
 #ifdef __cplusplus
 }
 #endif

@@ -28,21 +28,24 @@
 
 _mbdata_st mbdata;
 Parameter parameter = {
-    .ssid = "CMCC-TKAI",
-    .password = "tangshan0315",
+    .ssid = "K2P_2_4G",
+    .password = "378540108",
     .ble_name = "ESP_BLE",
     .baud = 4,
-    .mode = 8,
+    .mode = 4,
     .station = 1,
-    .coefficient = 1,
+    .coefficient = 103,
     .zero_error = 0,
     .skin = 0,
 
 };
-// static void set_mbdata()
-// {
-//     memcpy(mbdata.buf, &parameter, sizeof(parameter)); //将掉电不丢失的数据拷贝进数组
-// }
+static void set_mbdata()
+{
+    //set_config_param();
+    memset(&mbdata, 0, sizeof(mbdata));
+    get_config_param();
+    memcpy(mbdata.buf, &parameter, sizeof(parameter)); //将掉电不丢失的数据拷贝进数组
+}
 
 void app_main(void)
 {
@@ -56,7 +59,7 @@ void app_main(void)
         err = nvs_flash_init();
     }
     ESP_ERROR_CHECK(err);
-    //set_mbdata();
+    set_mbdata();
     //work mode config
     if ((parameter.mode & 0x01) == 0x01) //232
     {
@@ -81,7 +84,7 @@ void app_main(void)
         ESP_LOGI("MODE CONFIG:", "BLE");
         gatts_app();
     }
-    //xTaskCreate(get_weight_task, "get_weight_task", 1024, (void *)AF_INET, 5, NULL);
+    xTaskCreate(get_weight_task, "get_weight_task", 1024*2, (void *)AF_INET, 5, NULL);
 
     // while (1)
     // {

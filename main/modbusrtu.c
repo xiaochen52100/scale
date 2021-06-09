@@ -12,6 +12,7 @@
 #include "driver/gpio.h"
 #include "modbusrtu.h"
 #include "nvs_app.h"
+#include "HX711.h"
 /* Table of CRC values for high–order byte */
 const uint8_t crctablehi[] = {
 	0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81,
@@ -91,6 +92,8 @@ void mb_sentACK(uint8_t cm, uint8_t err,_serialbuf_st *tx)
 }
 /*
 回应 读保持寄存器，命令0X03
+读重量：01 03 00 40 00 02 C5 DF
+读零误差：01 03 00 34 00 02 85 C5   低半字在前
 */
 void mb_sentfor_readHoldingReg(const _mbdata_st mbd,_serialbuf_st *tx)
 {
@@ -131,32 +134,40 @@ void mb_sentfor_writeHoldingReg(_serialbuf_st rx,_mbdata_st *pmb,_serialbuf_st *
     {
         pmb->buf[pmb->start + i] = (uint16_t)(rx.buf[i * 2 + 7] << 8) + rx.buf[i * 2 + 8];
     }
-    if (pmb->buf[65]==1)    //触发清零操作
+    if (pmb->buf[66]==1)    //触发清零操作
     {
-        parameter.zero_error=pmb->buf[64];  //更新零误差
+        parameter.zero_error=adc/parameter.coefficient;  //更新零误差   01 10 00 42 00 01 02 00 01 68 b2
         set_config_param(); //保存数据
         memcpy(pmb->buf, &parameter, sizeof(parameter)); //将掉电不丢失的数据拷贝进数组
-        pmb->buf[65]=0;     //状态复位
-    }
-    if (pmb->buf[66]==1)    //触发去皮操作
-    {
-        parameter.skin=pmb->buf[64];  //更新皮重
-        set_config_param(); //保存数据
-        memcpy(pmb->buf, &parameter, sizeof(parameter)); //将掉电不丢失的数据拷贝进数组
+        ESP_LOGI("MODBUS  ", "zero_error %d", parameter.zero_error);
         pmb->buf[66]=0;     //状态复位
     }
-    if (pmb->buf[67]==1)    //触发校准操作
+    if (pmb->buf[67]==1)    //触发去皮操作
+    {
+        parameter.skin=weight_real;  //更新皮重
+        set_config_param(); //保存数据
+        memcpy(pmb->buf, &parameter, sizeof(parameter)); //将掉电不丢失的数据拷贝进数组
+        ESP_LOGI("MODBUS  ", "skin %d", parameter.skin);
+        pmb->buf[67]=0;     //状态复位
+    }
+    if ((pmb->buf[68]==1)&&(pmb->buf[69]==0))    //触发校准操作  01 10 00 44 00 01 02 00 01 68 d4
     {
         adc_old=adc;//保存当前adc
+        ESP_LOGI("MODBUS  ", "adc_old %ld", adc_old);
     }
-    if ((pmb->buf[67]==1)&&(pmb->buf[68]!=0))    //放置砝码
+    if ((pmb->buf[68]==1)&&(pmb->buf[69]!=0))    //放置砝码  10g:  01 10 00 45 00 01 02 00 0a 28 c2        100g:   01 10 00 45 00 01 02 00 64 a9 2e
     {
-        parameter.coefficient=(adc-adc_old)/pmb->buf[68];//计算系数
-        pmb->buf[67]=0;//状态清零
-        pmb->buf[68]=0;
+        ESP_LOGI("MODBUS  ", "adc %ld", adc);
+        ESP_LOGI("MODBUS  ", "pmb->buf[69] %d", pmb->buf[69]);
+        parameter.coefficient=abs(adc-adc_old)/pmb->buf[69];//计算系数
+        set_config_param(); //保存数据
+        memcpy(pmb->buf, &parameter, sizeof(parameter)); //将掉电不丢失的数据拷贝进数组
+        ESP_LOGI("MODBUS  ", "coefficient %d", parameter.coefficient);
+        pmb->buf[68]=0;//状态清零
+        pmb->buf[69]=0;
     }
     
-    esp_log_buffer_hex("pmb->buf  ", pmb->buf, pmb->len);
+    //esp_log_buffer_hex("pmb->buf  ", pmb->buf, pmb->len);
 
 }
 /*帧检测*/

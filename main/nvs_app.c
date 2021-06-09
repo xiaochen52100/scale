@@ -23,6 +23,7 @@ void get_config_param(void)
     err = nvs_open("deviceParameter", NVS_READWRITE, &config_handle);
     if (err != ESP_OK) {
         printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+        set_config_param();
     } 
     else 
     {

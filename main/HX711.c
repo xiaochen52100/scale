@@ -12,8 +12,7 @@
 #include "driver/gpio.h"
 #include "HX711.h"
 
-long hx711_buffer = 0;
-long weight_real = 0;
+int32_t weight_real = 0;
 unsigned long adc=0;
 unsigned long adc_old=0;
 unsigned long hx711_read(void);
@@ -106,9 +105,11 @@ void get_weight_task(void *arg)
     while (1)
     {
 		adc=get_weight();
-        RT_WEIGHT=(uint16_t)adc/parameter.coefficient-parameter.zero_error-parameter.skin;
-        ESP_LOGI(get_weight_TAG, "WEIGHT: %d g\n", RT_WEIGHT);
-        vTaskDelay(300 / portTICK_PERIOD_MS);				//delay 300MS
+        weight_real=(int32_t)(adc/parameter.coefficient-parameter.zero_error-parameter.skin);
+		mbdata.buf[64]=weight_real&0xffff;
+		mbdata.buf[65]=(weight_real>>16)&0xffff;	//低半字在前
+        ESP_LOGI(get_weight_TAG, "WEIGHT: %d g\n", weight_real);
+        vTaskDelay(500 / portTICK_PERIOD_MS);				//delay 200MS
     }
     
 }
