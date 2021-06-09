@@ -3,10 +3,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#include "nvs_app.h"
 
-void gatts_app(void);
-
+void wifi_init(char *ssid,char *password);
 #ifdef __cplusplus
 }
 #endif

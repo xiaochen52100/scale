@@ -7,10 +7,11 @@
 #include "freertos/task.h"
 #include "esp_system.h"
 #include "esp_spi_flash.h"
-#include "driver/uart.h"
-#include "driver/gpio.h"
 #include "esp_log.h"
+#include "esp_netif.h"
+#include "driver/gpio.h"
 #include "modbusrtu.h"
+#include "nvs_app.h"
 /* Table of CRC values for high–order byte */
 const uint8_t crctablehi[] = {
 	0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81,
@@ -53,7 +54,8 @@ const uint8_t crctablelo[] = {
 	0x44, 0x84, 0x85, 0x45, 0x87, 0x47, 0x46, 0x86, 0x82, 0x42, 0x43, 0x83, 0x41, 0x81, 0x80,
 	0x40
 };
-uint8_t local_addr=1;
+extern Parameter parameter;
+extern _mbdata_st mbdata;
 uint16_t usMBCRC16(uint8_t *ptr, uint32_t len)
 {
     uint8_t crchi = 0xff;
@@ -79,7 +81,7 @@ uint16_t usMBCRC16(uint8_t *ptr, uint32_t len)
 void mb_sentACK(uint8_t cm, uint8_t err,_serialbuf_st *tx)
 {
     uint16_t temp;
-    tx->buf[0] = local_addr;
+    tx->buf[0] = (uint8_t)parameter.station;
     tx->buf[1] = cm + 0x80;
     tx->buf[2] = err;
     temp = usMBCRC16(tx->buf, 3);
@@ -94,7 +96,7 @@ void mb_sentfor_readHoldingReg(const _mbdata_st mbd,_serialbuf_st *tx)
 {
     uint16_t temp;
     uint8_t len = mbd.len * 2 + 5;
-    tx->buf[0] = local_addr;
+    tx->buf[0] = (uint8_t)parameter.station;
     tx->buf[1] = 0x03;
     tx->buf[2] = mbd.len * 2;
     /*用户数据*/
@@ -129,7 +131,32 @@ void mb_sentfor_writeHoldingReg(_serialbuf_st rx,_mbdata_st *pmb,_serialbuf_st *
     {
         pmb->buf[pmb->start + i] = (uint16_t)(rx.buf[i * 2 + 7] << 8) + rx.buf[i * 2 + 8];
     }
-    esp_log_buffer_hex("pmb->buf  ", pmb->buf, 10);
+    if (pmb->buf[65]==1)    //触发清零操作
+    {
+        parameter.zero_error=pmb->buf[64];  //更新零误差
+        set_config_param(); //保存数据
+        memcpy(pmb->buf, &parameter, sizeof(parameter)); //将掉电不丢失的数据拷贝进数组
+        pmb->buf[65]=0;     //状态复位
+    }
+    if (pmb->buf[66]==1)    //触发去皮操作
+    {
+        parameter.skin=pmb->buf[64];  //更新皮重
+        set_config_param(); //保存数据
+        memcpy(pmb->buf, &parameter, sizeof(parameter)); //将掉电不丢失的数据拷贝进数组
+        pmb->buf[66]=0;     //状态复位
+    }
+    if (pmb->buf[67]==1)    //触发校准操作
+    {
+        adc_old=adc;//保存当前adc
+    }
+    if ((pmb->buf[67]==1)&&(pmb->buf[68]!=0))    //放置砝码
+    {
+        parameter.coefficient=(adc-adc_old)/pmb->buf[68];//计算系数
+        pmb->buf[67]=0;//状态清零
+        pmb->buf[68]=0;
+    }
+    
+    esp_log_buffer_hex("pmb->buf  ", pmb->buf, pmb->len);
 
 }
 /*帧检测*/
@@ -142,7 +169,7 @@ uint8_t frm_cheak(_serialbuf_st *rx, _mbfrm_st *pfrm)
     rx->len = 0;
 
     pfrm->addr = rx->buf[0];
-    if (pfrm->addr != local_addr)
+    if (pfrm->addr != (uint8_t)parameter.station)
         return res_ERR2;
     pfrm->crc = (uint16_t)(rx->buf[len - 1] << 8) + (rx->buf[len - 2]);
     t = usMBCRC16(rx->buf, len - 2);
@@ -172,7 +199,7 @@ uint8_t smb_recvHoldingReg(_mbdata_st *pmb,_serialbuf_st serialRXbuf_st,_serialb
     // ESP_LOGI("serial  ", "frm.rlen %d", frm.rlen);
     if (rel == res_OK)
     {
-        gpio_set_level(MODRXorTX_GPIO, 0);
+        gpio_set_level(MODRXorTX_GPIO, 1);
         //延时，给主机准备时间
         vTaskDelay(10 / portTICK_PERIOD_MS);
         pmb->len = frm.rlen;
@@ -184,9 +211,11 @@ uint8_t smb_recvHoldingReg(_mbdata_st *pmb,_serialbuf_st serialRXbuf_st,_serialb
             break;
         case 0x10: //写寄存器
             mb_sentfor_writeHoldingReg(serialRXbuf_st,pmb,tx);
+            memcpy(&parameter,pmb->buf,sizeof(parameter));//注意：发送字符串ascii的时候，高在前，例如：想写入“01”，需要发送的是31 30
+            //ESP_LOGI("serial  ", "parameter.ssid %s", parameter.ssid);
             break;
         }
-        gpio_set_level(MODRXorTX_GPIO, 1);
+        gpio_set_level(MODRXorTX_GPIO, 0);
     }
     else if (rel == res_ERR3)
     {

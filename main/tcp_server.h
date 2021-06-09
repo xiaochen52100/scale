@@ -4,9 +4,7 @@
 extern "C" {
 #endif
 #include "nvs_app.h"
-
-void gatts_app(void);
-
+void tcp_server_task(void *pvParameters);
 #ifdef __cplusplus
 }
 #endif

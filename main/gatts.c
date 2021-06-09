@@ -1,39 +1,22 @@
-/*
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
-*/
-
-/****************************************************************************
-*
-* This demo showcases BLE GATT server. It can send adv data, be connected by client.
-* Run the gatt_client demo, the client demo will automatically connect to the gatt_server demo.
-* Client demo will enable gatt_server's notify after connection. The two devices will then exchange
-* data.
-*
-****************************************************************************/
-
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <sys/param.h>
+#include <stdlib.h>
+#include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/event_groups.h"
 #include "esp_system.h"
+#include "esp_spi_flash.h"
 #include "esp_log.h"
-#include "nvs_flash.h"
+#include "esp_netif.h"
 #include "esp_bt.h"
-
 #include "esp_gap_ble_api.h"
 #include "esp_gatts_api.h"
 #include "esp_bt_defs.h"
 #include "esp_bt_main.h"
 #include "esp_gatt_common_api.h"
-#include "gatts.h"
 
-#include "sdkconfig.h"
+#include "gatts.h"
 
 #define GATTS_TAG "GATTS_DEMO"
 
@@ -61,7 +44,9 @@ static void gatts_profile_b_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
 static uint8_t char1_str[] = {0x11, 0x22, 0x33};
 static esp_gatt_char_prop_t a_property = 0;
 static esp_gatt_char_prop_t b_property = 0;
-
+static _serialbuf_st serialbuf;
+static _serialbuf_st senddata;
+static int send_len=0;
 static esp_attr_value_t gatts_demo_char1_val =
     {
         .attr_max_len = GATTS_DEMO_CHAR_VAL_LEN_MAX,
@@ -364,7 +349,7 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
         gl_profile_tab[PROFILE_A_APP_ID].service_id.id.uuid.len = ESP_UUID_LEN_16;
         gl_profile_tab[PROFILE_A_APP_ID].service_id.id.uuid.uuid.uuid16 = GATTS_SERVICE_UUID_TEST_A;
 
-        esp_err_t set_dev_name_ret = esp_ble_gap_set_device_name(TEST_DEVICE_NAME);
+        esp_err_t set_dev_name_ret = esp_ble_gap_set_device_name(parameter.ble_name);
         if (set_dev_name_ret)
         {
             ESP_LOGE(GATTS_TAG, "set device name failed, error code = %x", set_dev_name_ret);
@@ -422,6 +407,7 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
         if (!param->write.is_prep)
         {
             ESP_LOGI(GATTS_TAG, "GATT_WRITE_EVT, value len %d, value :", param->write.len);
+            //ESP_LOGI(GATTS_TAG, "GATT_WRITE_EVT, TEST");
             esp_log_buffer_hex(GATTS_TAG, param->write.value, param->write.len);
             if (gl_profile_tab[PROFILE_A_APP_ID].descr_handle == param->write.handle && param->write.len == 2)
             {
@@ -465,6 +451,20 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
                     ESP_LOGE(GATTS_TAG, "unknown descr value");
                     esp_log_buffer_hex(GATTS_TAG, param->write.value, param->write.len);
                 }
+            }
+            else //todo you work
+            {
+                memset(&serialbuf,0,sizeof(serialbuf));
+                memset(&senddata,0,sizeof(senddata));
+                serialbuf.len=param->write.len;
+                memcpy(serialbuf.buf,param->write.value,param->write.len);
+                serialbuf.len=param->write.len;
+                smb_recvHoldingReg(&mbdata,serialbuf,&senddata);
+                send_len=senddata.len;
+                esp_log_buffer_hex(GATTS_TAG, senddata.buf, send_len);
+                esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, gl_profile_tab[PROFILE_A_APP_ID].char_handle,
+                                                    send_len, senddata.buf, true);
+                
             }
         }
         example_write_event_env(gatts_if, &a_prepare_write_env, param);
@@ -657,16 +657,7 @@ static void gatts_profile_b_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
                     ESP_LOGE(GATTS_TAG, "unknown value");
                 }
             }
-            else //todo you work
-            {
-                uint8_t notify_data[20];
-                for (int i = 0; i < sizeof(notify_data); ++i)
-                {
-                    notify_data[i] = i % 0xff;
-                }
-                esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, gl_profile_tab[PROFILE_B_APP_ID].char_handle,
-                                            sizeof(notify_data), notify_data, false);
-            }
+            
         }
         example_write_event_env(gatts_if, &b_prepare_write_env, param);
         break;

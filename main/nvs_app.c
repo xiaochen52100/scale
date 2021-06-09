@@ -1,13 +1,20 @@
 #include <stdio.h>
+#include <string.h>
+#include <sys/param.h>
+#include <stdlib.h>
+#include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
-#include "nvs_flash.h"
+#include "esp_spi_flash.h"
+#include "esp_log.h"
+#include "esp_netif.h"
 #include "nvs.h"
+#include "nvs_flash.h"
+#include "nvs_app.h"
 
-Parameter parameter;
-Realtime_value realtime_value;
-void GetConfigParam(void)
+
+void get_config_param(void)
 {  
     esp_err_t err;
     nvs_handle_t config_handle;   
@@ -23,8 +30,8 @@ void GetConfigParam(void)
         // Read
         printf("Get parameter and key from NVS ... \n");
         //get parameter
-        len = sizeof(&parameter);
-        err = nvs_get_str(config_handle, "parameter", &parameter, &len);
+        len = sizeof(parameter);
+        err = nvs_get_blob(config_handle, "parameter", &parameter, &len);
         if(err==ESP_OK)
         {
             printf("Get parameter success!\n");
@@ -43,7 +50,7 @@ void GetConfigParam(void)
     nvs_close(config_handle);
 }
  
-void SetConfigParam(void)
+void set_config_param(void)
 {
     esp_err_t err;
     nvs_handle_t config_handle;  
@@ -57,7 +64,7 @@ void SetConfigParam(void)
         printf("opening NVS handle Done\n");
         printf("Set parameter from NVS ... \n");
         //write parameter
-        err=nvs_set_str(config_handle,"parameter",&parameter);
+        err=nvs_set_blob(config_handle,"parameter",&parameter,sizeof(parameter));
         if(err==ESP_OK)
             printf("set parameter success!\n");
         else

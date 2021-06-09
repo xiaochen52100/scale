@@ -1,11 +1,3 @@
-/* Hello World Example
-
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
-*/
 #include <stdio.h>
 #include <string.h>
 #include <sys/param.h>
@@ -18,128 +10,82 @@
 #include "driver/uart.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include "esp_netif.h"
+#include "protocol_examples_common.h"
+#include "lwip/err.h"
+#include "lwip/sockets.h"
+#include "lwip/sys.h"
+#include <lwip/netdb.h>
 #include "modbusrtu.h"
 #include "HX711.h"
 #include "gatts.h"
+#include "nvs.h"
+#include "nvs_flash.h"
+#include "nvs_app.h"
+#include "station_app.h"
+#include "tcp_server.h"
+#include "uart_app.h"
 
-#define TXD_PIN (GPIO_NUM_22)
-#define RXD_PIN (GPIO_NUM_23)
+_mbdata_st mbdata;
+Parameter parameter = {
+    .ssid = "CMCC-TKAI",
+    .password = "tangshan0315",
+    .ble_name = "ESP_BLE",
+    .baud = 4,
+    .mode = 8,
+    .station = 1,
+    .coefficient = 1,
+    .zero_error = 0,
+    .skin = 0,
 
-static const int RX_BUF_SIZE = 512;
-static _mbdata_st mbdata;
-
-static void set_mbdata()
-{
-    mbdata.buf[0]=0x0000;
-    mbdata.buf[1]=0x0001;
-    mbdata.buf[2]=0x0002;
-    mbdata.buf[3]=0x0003;
-    mbdata.buf[4]=0x0004;
-    mbdata.buf[5]=0x0005;
-}
-static void uart_init(void)
-{
-    const uart_config_t uart_config = {
-        .baud_rate = 115200,
-        .data_bits = UART_DATA_8_BITS,
-        .parity = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_APB,
-    };
-    // We won't use a buffer for sending data.
-    uart_driver_install(UART_NUM_1, RX_BUF_SIZE * 2, 0, 0, NULL, 0);
-    uart_param_config(UART_NUM_1, &uart_config);
-    uart_set_pin(UART_NUM_1, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-}
-static int serialSendData(const _serialbuf_st senddata)
-{
-    char *buf= (char *)malloc(senddata.len+1);
-    memcpy(buf,senddata.buf,senddata.len);
-    const int txBytes = uart_write_bytes(UART_NUM_1, buf, senddata.len);
-    return txBytes;
-}
-static void rx_task(void *arg)
-{
-    static const char *RX_TASK_TAG = "RX_TASK";
-    esp_log_level_set(RX_TASK_TAG, ESP_LOG_INFO);
-    //uint8_t senddata[512];// = (uint8_t *)malloc(RX_BUF_SIZE + 1);
-    _serialbuf_st serialbuf;
-    _serialbuf_st senddata;
-    while (1)
-    {
-        memset(&senddata,0,sizeof(_serialbuf_st));
-        serialbuf.len = uart_read_bytes(UART_NUM_1, serialbuf.buf, RX_BUF_SIZE, 10 / portTICK_RATE_MS);
-        if (serialbuf.len>0)
-        {
-            //ESP_LOGI("serial  ", "len %d", serialbuf.len);
-            esp_log_buffer_hex("serial  ", serialbuf.buf, serialbuf.len);
-            //smb_recvHoldingReg(&mbdata,serialbuf,&senddata);
-            //ESP_LOGI("serial  ", "len %d", senddata.len);
-            //esp_log_buffer_hex("serial  ", senddata.buf, senddata.len);
-            //serialSendData(senddata);
-            //vTaskDelay(50 / portTICK_PERIOD_MS);
-        }
-
-    }
-}
-
-#define M 10
-int filter2( void )
-{
-    int value_buf[M];
-    int count, i, j, temp;
-    for( count = 0; count < M; count++ )
-    {
-        value_buf[count] = (Get_Weight()-8230850)/103;
-        vTaskDelay(110 / portTICK_PERIOD_MS);
-    }
-    for( j = 0; j < M - 1; j++ )
-    {
-        for( i = 0; i < M - j - 1; i++ )
-        {
-            if( value_buf[i] > value_buf[i + 1] )
-            {
-                temp = value_buf[i];
-                value_buf[i] = value_buf[i + 1];
-                value_buf[i + 1] = temp;
-            }
-        }
-    }
-    return value_buf[( M - 1 ) / 2];
-}
+};
+// static void set_mbdata()
+// {
+//     memcpy(mbdata.buf, &parameter, sizeof(parameter)); //将掉电不丢失的数据拷贝进数组
+// }
 
 void app_main(void)
 {
-    int gross=0;//毛重
-    long Weight = 0;
-    printf("system start!\n");
-    set_mbdata();
-    uart_init();
-    xTaskCreate(rx_task, "uart_rx_task", 1024*4, NULL, configMAX_PRIORITIES, NULL);
-    gatts_app();
-    Init_Hx711();
-    gross = filter2();	//计算放在传感器上的重物重量
-    //char *data="12345";
-    //uint8_t readbuf[5]={0,0,0,0,0};
-    while (1)
+    //init nvs flash
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
-	    //printf("%d",filter2()-gross);	//串口显示重量
-        printf("%ld",(Get_Weight()-8230850)/103-gross);	//串口显示重量
-	    printf(" g\n");	//显示单位
-	    printf("\n");		//显示单位
-        
-        //uart_write_bytes(UART_NUM_1, data, 5);
-        // vTaskDelay(50 / portTICK_PERIOD_MS);				//延时1s
-        // int len=uart_read_bytes(UART_NUM_1, readbuf, 5, 10 / portTICK_RATE_MS);
-        // if (len>0)
-        // {
-        //     esp_log_buffer_hex("serial  ", readbuf, 5);
-        // }
-        
-	    vTaskDelay(300 / portTICK_PERIOD_MS);				//延时1s
-
-        
+        // NVS partition was truncated and needs to be erased
+        // Retry nvs_flash_init
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        err = nvs_flash_init();
     }
-    
+    ESP_ERROR_CHECK(err);
+    //set_mbdata();
+    //work mode config
+    if ((parameter.mode & 0x01) == 0x01) //232
+    {
+        ESP_LOGI("MODE CONFIG:", "RS232");
+        uart1_init(parameter.baud);
+        xTaskCreate(uart1_rx_task, "uart1_rx_task", 1024 * 4, NULL, configMAX_PRIORITIES, NULL);
+    }
+    if ((parameter.mode & 0x02) == 0x02) //485
+    {
+        ESP_LOGI("MODE CONFIG:", "RS485");
+        uart2_init(parameter.baud);
+        xTaskCreate(uart2_rx_task, "uart2_rx_task", 1024 * 4, NULL, configMAX_PRIORITIES, NULL);
+    }
+    if ((parameter.mode & 0x04) == 0x04) //wifi
+    {
+        ESP_LOGI("MODE CONFIG:", "WIFI");
+        wifi_init(parameter.ssid, parameter.password);
+        xTaskCreate(tcp_server_task, "tcp_server", 1024 * 6, (void *)AF_INET, 5, NULL);
+    }
+    if ((parameter.mode & 0x08) == 0x08) //BLE
+    {
+        ESP_LOGI("MODE CONFIG:", "BLE");
+        gatts_app();
+    }
+    //xTaskCreate(get_weight_task, "get_weight_task", 1024, (void *)AF_INET, 5, NULL);
+
+    // while (1)
+    // {
+    //     vTaskDelay(300 / portTICK_PERIOD_MS); //延时1s
+    // }
 }
+

@@ -7,20 +7,21 @@
 #include "freertos/task.h"
 #include "esp_system.h"
 #include "esp_spi_flash.h"
-#include "driver/uart.h"
-#include "driver/gpio.h"
 #include "esp_log.h"
+#include "esp_netif.h"
+#include "driver/gpio.h"
 #include "HX711.h"
 
-long HX711_Buffer = 0;
-long Weight_Maopi = 0,Weight_Shiwu = 0;
-
-#define GapValue 430
+long hx711_buffer = 0;
+long weight_real = 0;
+unsigned long adc=0;
+unsigned long adc_old=0;
+unsigned long hx711_read(void);
 
 //****************************************************
 //初始化HX711
 //****************************************************
-void Init_Hx711()
+void init_hx711()
 {
 	gpio_pad_select_gpio(HX711_SCK);
     gpio_set_direction(HX711_SCK, GPIO_MODE_OUTPUT);
@@ -30,29 +31,19 @@ void Init_Hx711()
 
 
 //****************************************************
-//获取毛皮重量
-//****************************************************
-void Get_Maopi()
-{
-	Weight_Maopi = HX711_Read();		
-} 
-
-//****************************************************
 //称重
 //****************************************************
-long Get_Weight()
+unsigned long get_weight()
 {
-	HX711_Buffer = HX711_Read();
-	Weight_Shiwu = HX711_Buffer;
-	Weight_Shiwu = Weight_Shiwu - Weight_Maopi;				//获取实物的AD采样数值。
-	//Weight_Shiwu = (long)((float)Weight_Shiwu/GapValue); 	
-	return Weight_Shiwu;
+	adc = hx711_read();
+	//weight_real = (long)((float)weight_real/GapValue); 	
+	return adc;
 }
 
 //****************************************************
 //读取HX711
 //****************************************************
-unsigned long HX711_Read(void)	//增益128
+unsigned long hx711_read(void)	//增益128
 {
 	unsigned long count; 
 	unsigned char i;
@@ -82,4 +73,42 @@ unsigned long HX711_Read(void)	//增益128
 	vTaskDelay(1 / portTICK_PERIOD_MS);
 	
 	return(count);
+}
+
+int filter_weight( void )
+{
+    int value_buf[M];
+    int count, i, j, temp;
+    for( count = 0; count < M; count++ )
+    {
+        value_buf[count] = (get_weight()-8230850)/103;
+        vTaskDelay(110 / portTICK_PERIOD_MS);
+    }
+    for( j = 0; j < M - 1; j++ )
+    {
+        for( i = 0; i < M - j - 1; i++ )
+        {
+            if( value_buf[i] > value_buf[i + 1] )
+            {
+                temp = value_buf[i];
+                value_buf[i] = value_buf[i + 1];
+                value_buf[i + 1] = temp;
+            }
+        }
+    }
+    return value_buf[( M - 1 ) / 2];
+}
+void get_weight_task(void *arg)
+{
+    static const char *get_weight_TAG = "get_weight_TAG";
+    esp_log_level_set(get_weight_TAG, ESP_LOG_INFO);
+	init_hx711();
+    while (1)
+    {
+		adc=get_weight();
+        RT_WEIGHT=(uint16_t)adc/parameter.coefficient-parameter.zero_error-parameter.skin;
+        ESP_LOGI(get_weight_TAG, "WEIGHT: %d g\n", RT_WEIGHT);
+        vTaskDelay(300 / portTICK_PERIOD_MS);				//delay 300MS
+    }
+    
 }
