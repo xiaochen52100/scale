@@ -10,7 +10,7 @@ typedef struct _parameter   //掉电不丢失参数，//对应mbdata0-64
 {
     char ssid[32];      //wifi名称
     char password[32];  //wifi密码
-    char ble_name[32];      //wifi名称
+    char ble_name[32];  //蓝牙名称
     uint16_t baud;      //波特率    1:9600  2:19200  3:38400 4:115200
     uint16_t mode;      //工作模式 低四位  0：232  1：485 2：wifi 3:BLE 
     uint16_t station;   //站号   
