@@ -136,7 +136,7 @@ void mb_sentfor_writeHoldingReg(_serialbuf_st rx,_mbdata_st *pmb,_serialbuf_st *
     }
     if (pmb->buf[66]==1)    //触发清零操作
     {
-        parameter.zero_error=adc/parameter.coefficient;  //更新零误差   01 10 00 42 00 01 02 00 01 68 b2
+        parameter.zero_error=((float)adc/parameter.coefficient)*10;  //更新零误差   01 10 00 42 00 01 02 00 01 68 b2
         set_config_param(); //保存数据
         memcpy(pmb->buf, &parameter, sizeof(parameter)); //将掉电不丢失的数据拷贝进数组
         ESP_LOGI("MODBUS  ", "zero_error %d", parameter.zero_error);
@@ -159,7 +159,8 @@ void mb_sentfor_writeHoldingReg(_serialbuf_st rx,_mbdata_st *pmb,_serialbuf_st *
     {
         ESP_LOGI("MODBUS  ", "adc %ld", adc);
         ESP_LOGI("MODBUS  ", "pmb->buf[69] %d", pmb->buf[69]);
-        parameter.coefficient=abs(adc-adc_old)/pmb->buf[69];//计算系数
+        parameter.coefficient=(adc-adc_old)/(pmb->buf[69]);
+        //parameter.coefficient=abs(adc-adc_old)/(pmb->buf[69]);//计算系数
         set_config_param(); //保存数据
         memcpy(pmb->buf, &parameter, sizeof(parameter)); //将掉电不丢失的数据拷贝进数组
         ESP_LOGI("MODBUS  ", "coefficient %d", parameter.coefficient);
