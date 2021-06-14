@@ -128,25 +128,28 @@ void mb_sentfor_writeHoldingReg(_serialbuf_st rx,_mbdata_st *pmb,_serialbuf_st *
     tx->buf[6] = temp;
     tx->buf[7] = temp >> 8;
     tx->len=8;
-
+    
     //修改保持寄存器
     for (i = 0; i < pmb->len; i++)
     {
         pmb->buf[pmb->start + i] = (uint16_t)(rx.buf[i * 2 + 7] << 8) + rx.buf[i * 2 + 8];
     }
+    memcpy(&parameter,pmb->buf,sizeof(parameter));
+    set_config_param(); //保存数据
+    //ESP_LOGI("MODBUS  ", "skin %d", parameter.skin);
     if (pmb->buf[66]==1)    //触发清零操作
     {
         parameter.zero_error=((float)adc/parameter.coefficient)*10;  //更新零误差   01 10 00 42 00 01 02 00 01 68 b2
-        set_config_param(); //保存数据
         memcpy(pmb->buf, &parameter, sizeof(parameter)); //将掉电不丢失的数据拷贝进数组
+        set_config_param(); //保存数据
         ESP_LOGI("MODBUS  ", "zero_error %d", parameter.zero_error);
         pmb->buf[66]=0;     //状态复位
     }
     if (pmb->buf[67]==1)    //触发去皮操作
     {
         parameter.skin=weight_real;  //更新皮重
-        set_config_param(); //保存数据
         memcpy(pmb->buf, &parameter, sizeof(parameter)); //将掉电不丢失的数据拷贝进数组
+        set_config_param(); //保存数据
         ESP_LOGI("MODBUS  ", "skin %d", parameter.skin);
         pmb->buf[67]=0;     //状态复位
     }
@@ -161,8 +164,8 @@ void mb_sentfor_writeHoldingReg(_serialbuf_st rx,_mbdata_st *pmb,_serialbuf_st *
         ESP_LOGI("MODBUS  ", "pmb->buf[69] %d", pmb->buf[69]);
         parameter.coefficient=(adc-adc_old)/(pmb->buf[69]);
         //parameter.coefficient=abs(adc-adc_old)/(pmb->buf[69]);//计算系数
-        set_config_param(); //保存数据
         memcpy(pmb->buf, &parameter, sizeof(parameter)); //将掉电不丢失的数据拷贝进数组
+        set_config_param(); //保存数据
         ESP_LOGI("MODBUS  ", "coefficient %d", parameter.coefficient);
         pmb->buf[68]=0;//状态清零
         pmb->buf[69]=0;

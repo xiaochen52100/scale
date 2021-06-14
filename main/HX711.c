@@ -103,6 +103,9 @@ void get_weight_task(void *arg)
 	static const char *get_weight_TAG = "get_weight_TAG";
 	esp_log_level_set(get_weight_TAG, ESP_LOG_INFO);
 	init_hx711();
+	adc = filter_weight();
+	parameter.zero_error = ((float)adc / parameter.coefficient) * 10;
+	set_config_param(); //保存数据
 	while (1)
 	{
 		adc = filter_weight();
