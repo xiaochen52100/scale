@@ -214,9 +214,9 @@ uint8_t smb_recvHoldingReg(_mbdata_st *pmb,_serialbuf_st serialRXbuf_st,_serialb
     // ESP_LOGI("serial  ", "frm.rlen %d", frm.rlen);
     if (rel == res_OK)
     {
-        gpio_set_level(MODRXorTX_GPIO, 1);
+        //gpio_set_level(MODRXorTX_GPIO, 1);
         //延时，给主机准备时间
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        //vTaskDelay(10 / portTICK_PERIOD_MS);
         pmb->len = frm.rlen;
         pmb->start = frm.start;
         switch (frm.cmd)
@@ -230,7 +230,7 @@ uint8_t smb_recvHoldingReg(_mbdata_st *pmb,_serialbuf_st serialRXbuf_st,_serialb
             //ESP_LOGI("serial  ", "parameter.ssid %s", parameter.ssid);
             break;
         }
-        gpio_set_level(MODRXorTX_GPIO, 0);
+        //gpio_set_level(MODRXorTX_GPIO, 0);
     }
     else if (rel == res_ERR3)
     {
